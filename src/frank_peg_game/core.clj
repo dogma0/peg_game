@@ -523,3 +523,50 @@ the lower left direction"
 ;; 
 
 ;; *** How to write this better? I.e. less bugs and more readable ***
+
+;; Bug Logs here:
+;; 1. command where there is also only letter => Caused by: java.lang.NullPointerException
+
+;; at clojure.lang.RT.intCast(RT.java:1216)
+;; at frank_peg_game.core$convert_to_number.invokeStatic(core.clj:459)
+;; at frank_peg_game.core$convert_to_number.invoke(core.clj:458)
+;; at frank_peg_game.core$eval358.invokeStatic(core.clj:513)
+;; at frank_peg_game.core$eval358.invoke(core.clj:510)
+;; at clojure.lang.Compiler.eval(Compiler.java:7176)
+;; at clojure.lang.Compiler.load(Compiler.java:7635)
+;; ...
+;; 2. commands of 3 or more characters like "da'" are accepted
+;; 3. when game finishes, no prompt, and it yields NPE sometimes
+;;       a-
+;;     b- c-
+;;    d@ e- f-
+;;  g- h- i- j-
+;; k@ l@ m- n- o@
+;; Enter your move
+;; km
+;;       a-
+;;     b- c-
+;;    d@ e- f-
+;;  g- h- i- j-
+;; k- l- m@ n- o@
+;; Exception in thread "main" Syntax error compiling at (/private/var/folders/tk/r0yh5b1d7zlgbfdj4fbddjkm0000gn/T/form-init5261698557887260098.clj:1:125).
+;; 	at clojure.lang.Compiler.load(Compiler.java:7647)
+;; 	at clojure.lang.Compiler.loadFile(Compiler.java:7573)
+;; 	at clojure.main$load_script.invokeStatic(main.clj:452)
+;; 	at clojure.main$init_opt.invokeStatic(main.clj:454)
+;; 	at clojure.main$init_opt.invoke(main.clj:454)
+;; 	at clojure.main$initialize.invokeStatic(main.clj:485)
+;; 	at clojure.main$null_opt.invokeStatic(main.clj:519)
+;; 	at clojure.main$null_opt.invoke(main.clj:516)
+;; 	at clojure.main$main.invokeStatic(main.clj:598)
+;; 	at clojure.main$main.doInvoke(main.clj:561)
+;; 	at clojure.lang.RestFn.applyTo(RestFn.java:137)
+;; 	at clojure.lang.Var.applyTo(Var.java:705)
+;; 	at clojure.main.main(main.java:37)
+;; Caused by: java.lang.Exception: Cannot find anything to run for: frank-peg-game.core
+;; 	at user$eval140.invokeStatic(form-init5261698557887260098.clj:1)
+;; 	at user$eval140.invoke(form-init5261698557887260098.clj:1)
+;; 	at clojure.lang.Compiler.eval(Compiler.java:7176)
+;; 	at clojure.lang.Compiler.eval(Compiler.java:7166)
+;; 	at clojure.lang.Compiler.load(Compiler.java:7635)
+;; 	... 12 more
