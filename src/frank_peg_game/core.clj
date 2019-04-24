@@ -59,6 +59,11 @@
   "Connections originated from num."
   (get-in board (conn-key num)))
 
+(defn in-between [board origin dest] (get (connections board origin) dest))
+
+(defn is-pegged? [board num]
+  (get-in board [:holes num :pegged]))
+
 (defn nrows [board]
   "The number of rows on the board."
   (:nrows board))
@@ -139,53 +144,41 @@
 
 ;; ======================================State Transition=======================================
 
-;; Move validation
-;; Given origin, destination
-;; 1.check if origin is pegged
-;; 2.check if dest in the keys of connections
-;; 3.check if the adjacent, that is the hole between dest and origin, is pegged
-;; validated
+(defn can-jump? [board origin dest]
+  (contains? (connections board origin) dest))
 
-
-(defn is-pegged? [board n] (get-in board [:holes n :pegged]))
-(defn adjacent [board origin dest] (get-in board [:holes origin :connections dest]))
-(defn are-connected? [board origin dest] (not (nil? (adjacent board origin dest))))
 (defn valid-move? [board origin dest]
   (every? true?
           [(is-pegged? board origin)
-           (are-connected? board origin dest)
-           (let [adj (adjacent board origin dest)]
-             (is-pegged? board adj))]))
+           (can-jump? board origin dest)
+           (is-pegged? board (in-between board origin dest))]))
 
-(defn make-move [board origin dest]
+(defn peg-at-loc-moved [board peg-loc val]
+  "Set peg-loc's pegged value to val."
+  (assoc-in board [:holes peg-loc :pegged] val))
+
+(defn jumped-board [board origin dest]
+  "Return board with the jump made if the jump is legal, return the same board otherwise."
   (if (valid-move? board origin dest)
-    (let [dest-pegged-key [:holes dest :pegged]
-          origin-pegged-key [:holes origin :pegged]
-          adj-pegged-key [:holes (adjacent board origin dest) :pegged]]
-      (-> board
-          (assoc-in origin-pegged-key false)
-          (assoc-in adj-pegged-key false)
-          (assoc-in dest-pegged-key true)))
+    (-> board
+        (peg-at-loc-moved origin false)
+        (peg-at-loc-moved (in-between board origin dest) false)
+        (peg-at-loc-moved dest true))
     board))
 
-
-
-
-
-;; *** When I write code, am I depending too much on the data structure? I.e. too much coupling betwee data and processes ***
-
-
-(defn valid-move-from-origin? [board origin]
-  (let [valid-dests (keys (get-in board [:holes origin :connections]))]
-    (not-every? false? (map #(valid-move? board origin %) valid-dests))))
+(defn valid-move-exists? [board origin]
+  "True if there are legal moves from origin, false otherwise."
+  (let [valid-dests (keys (connections board origin))
+        valid-move-from-origin? (partial valid-move? board origin)]
+    (not-every?
+     false?
+     (map
+      valid-move-from-origin?
+      valid-dests))))
 
 (defn is-game-over? [board]
-  (let [origins (keys (get-in board [:holes]))]
-    (every? false? (map (partial valid-move-from-origin? board) origins))))
-
-
-
-
+  (let [origins (keys (:holes board))]
+    (every? false? (map #(valid-move-exists? board %) origins))))
 
 ;; ===============================Ui and User Interactions======================================
 
@@ -260,7 +253,7 @@
 ;;   (do (let [move (get-user-answer "Enter your move")
 ;;             origin (convert-to-number (str (first move)))
 ;;             dest (convert-to-number (str (second move)))]
-;;         (swap! board make-move origin dest))
+;;         (swap! board jumped-board origin dest))
 ;;       (print-board @board)))
 
 ;; "f d" breaks everything?
@@ -481,7 +474,7 @@
      true))
 
 (is (=
-     (make-move test-board-3-top-removed 4 1)
+     (jumped-board test-board-3-top-removed 4 1)
      {:nrows 3,
       :holes
       {1 {:pegged true, :connections {4 2, 6 3}},
@@ -492,7 +485,7 @@
        6 {:pegged true, :connections {1 3, 4 5}}}}))
 
 (is (=
-     (make-move test-board-3-top-removed 3 1)
+     (jumped-board test-board-3-top-removed 3 1)
      test-board-3-top-removed))
 
 (is (=
