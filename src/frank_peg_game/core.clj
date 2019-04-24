@@ -144,6 +144,7 @@
 
 ;; ======================================State Transition=======================================
 
+
 (defn can-jump? [board origin dest]
   (contains? (connections board origin) dest))
 
@@ -180,82 +181,115 @@
   (let [origins (keys (:holes board))]
     (every? false? (map #(valid-move-exists? board %) origins))))
 
-;; ===============================Ui and User Interactions======================================
+;; =======================================UI=========================================
 
-;; User prompts
+(defn convert-letter [num]
+  "Return num's alphabetical representation, e.g 1 => a"
+  (char (+ 96 num)))
 
+(defn convert-to-number [s]
+  "Given a string of 1 character, return its numeric representation."
+  (- (int (first s)) 96))
 
+(defn print-row-centered [num-rows text]
+  "Given total number of rows on the board, print text centered in that row with space paddings."
+  (let [text-len (count text)
+        last-row-num-chars (+ (* num-rows 2) (dec num-rows))
+        space-pad (apply str (take (/ (- last-row-num-chars text-len) 2) (repeat " ")))]
+    (printf "%s%s%s\n" space-pad text space-pad)))
+
+(defn row-seq [row-num]
+  "Given the row number, return a seqence of all the numbers in that row."
+  (if (= row-num 1)
+    [1]
+    (let [start (inc (nth triangular-seq (- row-num 2)))
+          end (inc (nth triangular-seq (dec row-num)))]
+      (range start end))))
+
+(defn letterized-row [board row]
+  "Convert all holes in rows to their numeric representations."
+  (map (fn [hole]
+         (str (convert-letter hole)
+              (if (is-pegged? board hole)
+                "@"
+                "-")))
+       row))
+
+(defn print-board [board]
+  (let [row-num-seq (range 1 (inc (nrows board)))
+        board-numeric (map #(row-seq %) row-num-seq)
+        letterized-board (map (partial letterized-row board) board-numeric)]
+    (doseq [row-num row-num-seq]
+      (let [row-numeric (nth letterized-board (dec row-num))
+            row-str (apply str (interleave row-numeric (repeat " ")))]
+        (print-row-centered (nrows board)
+                            row-str)))))
+
+(defn within-boundary? [board num]
+  (and (<= 1 num) (<= num (max-num (nrows board)))))
+
+;; ===============================User Interactions======================================
 (defn get-user-answer [question-txt]
   (println question-txt)
   (read-line))
 
-(defn greeting []
-  (println "\nWelcome to Frank's the Peg Game (¬‿¬)"))
-
 (defn get-num-rows []
-  (Integer/parseInt (get-user-answer "\nHow many rows?")))
+  (Integer/parseInt (get-user-answer "\nHow many rows? ~>")))
 
-(defn convert-letter [n]
-  "1 -> (char) a"
-  (let [asicc-pad 96]
-    (char (+ asicc-pad n))))
+(defn get-first-removal-num [default]
+  (let [ans (get-user-answer "\nRemove the first peg ~>")]
+    (if (= 1 (count ans))
+      (convert-to-number ans)
+      default)))
 
-(defn convert-to-number [s]
-  (- (int (first s)) 96))
+(defn get-move [_]
+  (let [ans (get-user-answer "\n Enter your next move, e.g. ad ~>")]
+    (if (= 2 (count ans))
+      ans
+      nil)))
 
-(defn get-first-removal []
-  (get-user-answer "\nRemove the first peg"))
+;; ===================================Main====================================================
+(println "Welcome to Frank's the Peg Game (¬‿¬) ~>")
+(def board (atom (board-nrows (get-num-rows))))
+(print-board @board)
+(def first-removal-num (atom (get-first-removal-num -1)))
+(println "\n\n\n")
 
-;; =======================================Visualization=========================================
+(defn main []
+  (while (not (within-boundary? @board @first-removal-num))
+    (println "Invalid removal!!! ~>")
+    (print-board @board)
+    (swap! first-removal-num get-first-removal-num)
+    (println "\n\n\n"))
 
-(defn print-row-centered [nth-row num-rows text]
-  "text will always be 2 characters long"
-  (let [text-len (count text)
-        last-row-num-chars (+ (* num-rows 2) (dec num-rows))
-        normalized-last-row-nchars (if (even? text-len)
-                                     (if (even? last-row-num-chars)
-                                       last-row-num-chars
-                                       (inc last-row-num-chars))
-                                     (if (odd? last-row-num-chars)
-                                       last-row-num-chars
-                                       (inc last-row-num-chars)))
-        space-pad (apply str (take (/ (- normalized-last-row-nchars text-len) 2) (repeat " ")))]
-    (printf "%s%s%s\n" space-pad text space-pad)))
+  (swap! board assoc-in [:holes @first-removal-num :pegged] false)
+  (println (str (convert-letter @first-removal-num) " removed ~>"))
+  (print-board @board)
+  (println "\n\n\n")
 
-(defn row-seq [row-number]
-  (if (= row-number 1)
-    [1]
-    (let [start (inc (nth triangular-seq (- row-number 2)))
-          end (inc (nth triangular-seq (dec row-number)))]
-      (range start end))))
+  (while (not (is-game-over? @board))
+    (def user-move (atom (get-move "")))
+    (while (or (not @user-move)
+               (not (within-boundary? @board (convert-to-number (str (first @user-move)))))
+               (not (within-boundary? @board (convert-to-number (str (second @user-move))))))
+      (println (str @user-move " invalid move!!! ~>"))
+      (print-board @board)
+      (swap! user-move get-move)
+      (println "\n\n\n"))
 
-(defn print-board [board]
-  (let [triangle-seq (map #(row-seq %) (range 1 (inc (:nrows board))))
-        letterized-board (map
-                          (fn [row]
-                            (map #(str (convert-letter %) (if (is-pegged? board %) "@" "-"))
-                                 row))
-                          triangle-seq)]
-    (doseq [row-number (range 1 (inc (count letterized-board)))]
-      (print-row-centered row-number
-                          (:nrows board)
-                          (apply str
-                                 (interleave (nth letterized-board (dec row-number))
-                                             (repeat " ")))))))
+    (swap! board jumped-board
+           (convert-to-number (str (first @user-move)))
+           (convert-to-number (str (second @user-move))))
+
+    (print-board @board))
+  (println "Game is finished, number of pegs left: " (count (filter
+                                                             #(true? (:pegged %))
+                                                             (vals (:holes @board))))))
+
+(main)
+
 
 ;; ===================================End of Source============================================
-;; (greeting)
-;; (def board (atom (board-nrows (get-num-rows))))
-;; (def first-removal (convert-to-number (get-first-removal)))
-;; (swap! board assoc-in [:holes first-removal :pegged] false)
-;; (print-board @board)
-;; (while (not (is-game-over? @board))
-;;   (do (let [move (get-user-answer "Enter your move")
-;;             origin (convert-to-number (str (first move)))
-;;             dest (convert-to-number (str (second move)))]
-;;         (swap! board jumped-board origin dest))
-;;       (print-board @board)))
-
 ;; "f d" breaks everything?
 ;;  aO       
 ;; bO cO     
@@ -314,6 +348,7 @@
 ;; 	... 12 more
 
 ;; =====================================TESTSUITE==============================================
+
 
 (def test-board-3
   {:nrows 3,
